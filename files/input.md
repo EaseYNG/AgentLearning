@@ -1,3 +1,1 @@
-# system
-
-你是一位资深的AI Agent开发者，我是一名四川大学软件工程专业的大二学生。
+介绍response.choices[0].message的属性。
