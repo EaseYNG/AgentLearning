@@ -1,26 +1,110 @@
 [
   {
     "role": "user",
-    "content": "# system\n\n你是一位资深的AI Agent开发者，我是一名四川大学软件工程专业的大二学生。\n\n# 任务\n\n你可以给我讲讲openai api如何进行function calling吗，请详细全面一点。"
+    "content": "查询成都市的天气情况\n"
   },
   {
     "role": "assistant",
-    "content": "你好！很高兴看到你对构建 AI Agent 的核心技术感兴趣。作为川大软工的学生，你一定对系统交互和 API 设计不陌生。**Function Calling（函数调用）** 是大语言模型从“聊天机器人”进化为“智能体（Agent）”的关键桥梁。它允许模型自主决定何时、何地以及如何调用外部工具或 API。\n\n下面我从**原理、流程、代码实现**三个维度为你详细拆解。\n\n### 1. 核心原理\n传统模式下，模型只能输出自然文本。开启 Function Calling 后，模型被赋予了“结构化输出”的能力。通过预定义的 **JSON Schema**，模型可以在回复中生成包含特定函数名和参数的对象，而不是直接编造答案。这解决了模型无法实时访问数据（如天气、数据库、API）的问题。\n\n### 2. 标准工作流（The Loop）\n构建一个支持 Function Calling 的 Agent 通常包含以下四步循环：\n1.  **定义工具（Define Tools）**：在请求参数 `tools` 中声明可用函数的名称、描述及参数 Schema。\n2.  **模型决策（Model Decision）**：用户发送 Prompt，模型判断是否需要调用工具。如果需要，返回格式化的 `tool_calls` 字段；否则直接输出文本。\n3.  **执行与回传（Execute & Return）**：**注意！这是后端逻辑**。你的代码解析出模型想要调用的函数，实际执行该 Python 函数（如查询数据库），然后将结果追加到对话历史中。\n4.  **生成最终回复（Generate Response）**：再次将更新后的历史记录发给模型，让模型根据工具返回的实际结果组织语言回答用户。\n\n### 3. Python 代码示例\n基于 `openai` 官方库，以下是简化版演示：\n\n```python\nfrom openai import OpenAI\nimport json\n\nclient = OpenAI(api_key=\"YOUR_API_KEY\")\n\n# 1. 定义工具函数\ndef get_current_weather(location, unit='celsius'):\n    \"\"\"模拟获取天气\"\"\"\n    print(f\"调用外部接口获取 {location} 的天气...\")\n    return f\"{location}: 晴朗，25{unit}\"\n\n# 2. 构造请求结构\ntools = [{\n    \"type\": \"function\",\n    \"function\": {\n        \"name\": \"get_current_weather\",\n        \"description\": \"获取指定城市的当前天气\",\n        \"parameters\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"location\": {\"type\": \"string\", \"description\": \"城市名\"},\n                \"unit\": {\"type\": \"string\", \"enum\": [\"celsius\", \"fahrenheit\"]}\n            },\n            \"required\": [\"location\"]\n        }\n    }\n}]\n\n# 3. 发起第一次请求（假设模型决定调用函数）\nresponse = client.chat.completions.create(\n    model=\"gpt-4o-mini\", # 推荐使用最新模型\n    messages=[{\"role\": \"user\", \"content\": \"成都明天天气如何？\"}],\n    tools=tools,\n    tool_choice=\"auto\" # 自动决定是否调用\n)\n\nif response.choices[0].message.tool_calls:\n    # 4. 解析并执行真实函数\n    tool_call_id = response.choices[0].message.tool_calls[0].id\n    func_name = response.choices[0].message.tool_calls[0].function.name\n    args = json.loads(response.choices[0].message.tool_calls[0].function.arguments)\n    \n    result = eval(func_name)(**args) # 实际开发请避免 eval，用动态导入\n    \n    # 5. 构建第二次请求（提交工具结果）\n    messages = response.choices[0].message.to_dict()\n    messages['tool_calls'][0]['function']['arguments'] = result # 简化处理，实际需加 role: tool\n    \n    final_response = client.chat.completions.create(\n        model=\"gpt-4o-mini\",\n        messages=messages\n    )\n    print(final_response.choices[0].message.content)\n```\n\n### 💡 资深开发者的建议（避坑指南）\n1.  **安全性第一**：模型生成的参数必须经过严格校验再执行，防止提示词注入攻击。不要直接 `eval` 生成的字符串，建议使用参数验证库（如 Pydantic）。\n2.  **容错机制**：网络请求可能失败，如果工具报错，要将错误信息包装成友好的文本重新喂给模型，让它尝试解释或重试。\n3.  **Stream 支持**：利用 `stream=True` 可以分块接收 `tool_calls` 的开始和结束事件，提升用户体验，但这会增加状态管理的复杂度。\n4.  **上下文管理**：Function Calling 本质上是一个多轮对话过程，你需要维护好 `system message` 以告知模型它的身份和约束条件。\n\n建议你结合操作系统中的 IO 多路复用概念来理解这个异步流程。如果有具体的 Agent 场景想法，随时可以讨论！加油，软工的同学们，未来可期！🚀"
+    "content": ""
   },
   {
     "role": "user",
-    "content": "我阅读了你生成的function calling 指南，我想知道更多有关response.choices[0].message的内容，比如它包含哪些字段，\n以及如何获取它里面的tool调用信息。"
+    "content": "查询成都市的天气情况\n"
   },
   {
     "role": "assistant",
-    "content": "很高兴你对细节这么关注！对于软工专业的同学来说，理解数据结构（Data Structure）和对象模型（Object Model）是构建健壮系统的基础。`response.choices[0].message` 是 OpenAI Chat Completion API 返回的核心对象之一，它承载了模型生成的最终内容。\n\n在 Function Calling 场景下，这个对象的结构会比普通对话稍微复杂一点。下面我为你详细拆解它的内部结构、字段含义以及如何安全高效地提取工具调用信息。\n\n### 1. 对象核心结构概览\n\n当你发送请求并收到响应时，`choices` 是一个列表（通常只有一个元素），每个元素代表模型生成的一条候选回复。\n\n```python\n# 伪代码结构示意\n{\n    \"id\": \"chatcmpl-...\",       # 会话 ID\n    \"object\": \"chat.completion\",\n    \"created\": 1699...,          # 时间戳\n    \"model\": \"gpt-4o-mini\",\n    \"choices\": [                # 选择列表\n        {\n            \"index\": 0,         # 索引\n            \"message\": {        # <-- 重点：这里是你的问题所在\n                \"role\": \"assistant\", # 角色（始终是 assistant）\n                \"content\": None,     # 文本内容（如果调用了工具，这里可能是 null）\n                \"tool_calls\": [      # 工具调用列表（如果有工具被调用）\n                    {\n                        \"index\": 0,\n                        \"id\": \"call_...\",       # 工具调用唯一 ID（回传时必须携带）\n                        \"type\": \"function\",\n                        \"function\": {           # 函数定义\n                            \"name\": \"get_weather\",\n                            \"arguments\": \"{\\\"city\\\": \\\"Chengdu\\\"}\" # 注意：这是一个 JSON 字符串\n                        }\n                    }\n                ],\n                \"function_call\": null,        # 旧版兼容字段，新版本建议用 tool_calls\n                \"refusal\": null               # 拒绝回答的内容\n            },\n            \"logprobs\": ...,\n            \"finish_reason\": \"tool_calls\"     # 结束原因关键字段\n        }\n    ]\n}\n```\n\n### 2. 关键字段详解\n\n#### A. `role` (角色)\n*   **值**: 通常是 `\"assistant\"`。\n*   **作用**: 告诉你是模型的输出，不是用户的输入。在构建多轮对话上下文时，你需要保持这个角色的历史消息记录。\n\n#### B. `content` (文本内容)\n*   **类型**: `Optional[str]`。\n*   **场景**:\n    *   如果模型**不需要**调用任何工具，它会直接在 `content` 里给你答案。\n    *   如果模型**决定调用**工具，这行通常会为空（`null` 或 `\"\"`），因为任务还没完成，先让后端执行。\n\n#### C. `tool_calls` (工具调用信息) —— **核心**\n这是 Function Calling 最关键的部分。它是一个列表 `[ToolCall]`。\n\n*   **为什么是列表？** 有时候你可以一次让模型调用多个工具（并行执行）。虽然少见，但结构上必须支持。\n*   **如何访问？**: `messages[0].tool_calls`。\n*   **注意事项**:\n    *   如果未调用工具，该字段为 `None`。\n    *   如果是流式输出 (`stream=True`)，这个字段是在最后才完整出现的（需要聚合 `delta`）。\n\n#### D. `tool_calls[0].function.arguments` (参数)\n*   **类型**: `str` (JSON 格式的字符串)。\n*   **陷阱**: 这里的参数**不是** Python 字典，而是 JSON 字符串。你必须使用 `json.loads()` 将其反序列化。\n*   **例子**: `'{\"location\": \"Chengdu\"}'`\n\n#### E. `finish_reason` (结束原因)\n*   **重要性**: 判断是否需要进入“第二步”（即执行工具函数的关键逻辑）。\n*   **值**:\n    *   `\"tool_calls\"`: 表示模型决定调用工具。**你的代码逻辑此时必须转向执行外部函数。**\n    *   `\"stop\"` 或 `\"length\"`: 表示模型直接给出了回答，无需调用工具。\n\n### 3. 获取与解析工具调用的最佳实践代码\n\n作为软工学生，我建议你封装一个解析器，而不是每次写一遍 `try-except`。以下是生产级别的解析逻辑示例：\n\n```python\nimport json\nfrom openai import OpenAI\nfrom typing import Optional, List, Dict, Any\n\ndef parse_function_call(message_content: Any) -> List[Dict[str, Any]]:\n    \"\"\"\n    从 message 中提取工具调用信息\n    :param message_content: response.choices[0].message\n    :return: 包含工具名、ID、参数字典的列表\n    \"\"\"\n    if not hasattr(message_content, 'tool_calls') or not message_content.tool_calls:\n        return []\n    \n    extracted_tools = []\n    \n    for tool_call in message_content.tool_calls:\n        func_info = {\n            \"id\": tool_call.id,              # 必须原样回传给 API\n            \"function_name\": tool_call.function.name,\n            \"arguments_raw\": tool_call.function.arguments, # 原始 JSON 字符串\n        }\n        \n        try:\n            # 安全地解析 JSON\n            func_info[\"arguments\"] = json.loads(tool_call.function.arguments)\n        except json.JSONDecodeError:\n            # 处理解析失败的边缘情况\n            print(f\"错误：无法解析参数 {func_info['arguments_raw']}\")\n            func_info[\"arguments\"] = {} \n        \n        extracted_tools.append(func_info)\n        \n    return extracted_tools\n\n# --- 模拟使用流程 ---\nclient = OpenAI()\n# ... (前面的请求发起部分省略) ...\n\n# 假设获取到了 response\nresponse = client.chat.completions.create(...)\nmessage = response.choices[0].message\n\n# 1. 检查是否有工具调用\ntools_to_exec = parse_function_call(message)\n\nif tools_to_exec:\n    print(\"⚡ 发现工具调用请求：\")\n    for tool in tools_to_exec:\n        print(f\"- ID: {tool['id']}\")\n        print(f\"- 函数：{tool['function_name']}\")\n        print(f\"- 参数：{tool['arguments']}\")\n        \n        # TODO: 这里执行真正的 Python 逻辑\n        # real_result = your_python_function(**tool['arguments'])\n        # ...\n    else:\n        print(\"模型直接返回了自然语言回答\")\n```\n\n### 4. 进阶注意点（避坑指南）\n\n1.  **关于 `function_call` 字段**:\n    *   在早期的 API 版本中，使用的是 `message.function_call` 对象。\n    *   现在（gpt-3.5-turbo-1106 之后及 gpt-4 系列），标准统一为 `message.tool_calls` 列表。\n    *   **建议**：无论使用什么模型，都优先检查 `tool_calls`，以兼容性为主。\n\n2.  **流式处理 (`stream=True`) 的差异**:\n    *   如果你开启了 `stream=True`，`message` 对象不会一次性出现。\n    *   你会收到一系列 `chunk`。当 `chunk` 中的 `tool_calls` 出现时，它是逐渐累积的。\n    *   特别是 `arguments` 字段，它会分片到达（Chunked），你需要自己维护一个变量拼接字符串，直到 `finish_reason='tool_calls'` 才认为完整。\n    *   **策略**：非实时性要求不高的后台 Agent，建议使用非流式接口来简化解析逻辑；前端体验敏感的则需开发专门的 Stream Parser。\n\n3.  **工具 ID (`id`) 的重要性**:\n    *   当你把工具执行结果喂回给 API 时（第二轮交互），必须在新的 Message 对象中包含 `tool_call_id`，其值必须等于第一轮收到的 `tool_calls[0].id`。\n    *   这是关联“哪次请求对应哪个结果”的唯一凭证。如果 ID 匹配不上，API 会报错或导致模型困惑。\n\n4.  **参数校验**:\n    *   API 返回的参数虽然是基于 Schema 的，但有时模型还是会“幻觉”。比如你定义了 `int` 类型，它可能传了 `\"hello\"`。\n    *   **工程建议**: 不要完全信任模型输出的参数。在进入 `eval(func_name)` 或数据库查询前，务必进行类型检查和范围验证（可以使用 `pydantic` 做数据模型验证）。\n\n### 5. 总结\n\n作为开发者，看待 `response.choices[0].message` 不应只是看文本，而应把它看作一个**状态机**。\n*   看到 `tool_calls` 非空 -> 切换到 **Executor 模式**。\n*   拿到 `tool_calls[].id` -> 标记 **待回传状态**。\n*   拿到 `finish_reason=\"stop\"` -> 切换到 **Response 模式**。\n\n希望这个深度的技术拆解能帮助你更好地理解底层交互逻辑。如果在实现过程中遇到具体的解析错误或并发调用问题，欢迎随时再来探讨！💪"
+    "content": ""
   },
   {
     "role": "user",
-    "content": "介绍response.choices[0].message的属性。"
+    "content": "查询成都市的天气情况\n"
   },
   {
+    "role": "user",
+    "content": "查询成都市的天气情况\n"
+  },
+  {
+    "content": "我来帮您查询成都市的天气情况。",
     "role": "assistant",
-    "content": "你好！作为软工专业的学生，深入理解数据结构（Data Model）是构建稳定系统的关键。`response.choices[0].message` 是 OpenAI Chat Completion API 响应中的核心对象之一，它代表了模型生成的**单条回复消息**。\n\n在 Function Calling 场景下，这个对象的字段含义和普通聊天场景会有显著不同。下面我为你整理了该对象的所有关键属性、数据类型、语义说明以及获取方式。\n\n### 1. 对象结构概览\n\n为了直观理解，我们先看它的 JSON 层级结构：\n\n```json\n{\n  \"id\": \"chatcmpl-...\",\n  \"object\": \"chat.completion\",\n  \"created\": 1699...,\n  \"model\": \"gpt-4o-mini\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {       // <-- 这里是你要分析的 message 对象\n         \"role\": \"assistant\",\n         \"content\": null,\n         \"tool_calls\": [...],\n         \"function_call\": null,\n         \"refusal\": null,\n         \"name\": null\n      },\n      \"finish_reason\": \"tool_calls\", // ⚠️ 注意：这个不在 message 里，在 choice 里\n      \"logprobs\": ...\n    }\n  ]\n}\n```\n\n### 2. 详细属性字典 (Attributes Reference)\n\n以下是 `message` 对象内部的具体字段详解：\n\n| 属性名 (Attribute) | 数据类型 (Type) | 必填项 | 描述与用法 |\n| :--- | :--- | :--- | :--- |\n| **`role`** | `str` | 是 | **角色标识**。通常固定为 `\"assistant\"`。在多轮对话历史管理中，需保持此标签不变。 |\n| **`content`** | `Optional[str]` | 否 | **文本内容**。<br>1. **普通模式**：包含模型的最终回答字符串。<br>2. **FC 模式**：如果调用了工具，此处通常为 `null` (None)。若模型决定直接回答，这里会有值。 |\n| **`tool_calls`** | `Optional[List[ToolCall]]` | 否 | **工具调用列表**。<br>Function Calling 的核心字段。是一个列表，支持并行多个工具调用。每个元素包含 `id`, `function`, `type`。 |\n| **`function_call`** | `Optional[Dict]` | 否 | **旧版兼容字段**。<br>早于 `tool_calls` 的机制。新版本建议使用 `tool_calls`，但为了兼容旧代码，有时仍需检查。 |\n| **`refusal`** | `Optional[str]` | 否 | **拒绝内容**。<br>当模型因安全策略或系统限制拒绝回答时填充的内容（通常用于敏感内容拦截）。 |\n| **`name`** | `Optional[str]` | 否 | **名称标识**。<br>主要用于某些特定配置（如指定 assistant 昵称），在标准 FC 流程中较少用到，默认为空。 |\n| **`audio`** | `Optional[Dict]` | 否 | **音频数据**。<br>仅在使用语音模型（Audio API）且返回语音流时出现，标准文本对话不包含此项。 |\n| **`annotations`** | `Optional[List]` | 否 | **引用标注**。<br>针对 RAG 或引用源内容的元数据标记，较新的模型功能。 |\n\n### 3. 深度解析：Function Calling 专用字段\n\n在 Agent 开发中，你主要关注的是 `tool_calls` 和 `content` 的互斥关系。\n\n#### A. `tool_calls` (List[ToolCall])\n这是 Function Calling 的灵魂。它是一个列表，因为模型可以一次性决定并行执行多个任务。\n\n*   **访问路径**: `msg.tool_calls`\n*   **类型**: `list` 或 `None`\n*   **内部结构** (`ChatCompletionMessageToolCall`):\n    ```python\n    # 伪代码结构\n    {\n        \"index\": 0,             # 列表索引\n        \"id\": \"call_abc123\",    # 🔑 核心 ID，回传时必须原样使用\n        \"type\": \"function\",     # 固定为 \"function\"\n        \"function\": {           # 🎯 函数定义块\n            \"name\": \"get_weather\",\n            \"arguments\": \"{\\\"location\\\": \\\"Chengdu\\\"}\" # 注意：这是 JSON 字符串\n        }\n    }\n    ```\n*   **注意点**：\n    *   `arguments` 必须被 `json.loads()` 解析成字典才能给 Python 函数用。\n    *   `id` 必须在第二轮请求（回传结果）时放在一个新的 message 对象的 `tool_call_id` 中。\n\n#### B. `content` (str / None)\n*   **互斥性**：在 Function Calling 模式下，通常 `content` 为空，`tool_calls` 有值；反之亦然。但也存在“混合情况”（模型先说一段话，再调用工具），此时两者都可能有值。\n*   **工程处理**：不要假设它一定不为空，接收消息后建议先 `check if msg.content is not None`。\n\n#### C. `finish_reason` (⚠️ 重要区别)\n*   **位置**：请注意，`finish_reason` **不在** `message` 对象内，而是在其父级 `choices[0]` 对象内。\n*   **原因**：很多初学者会尝试访问 `message.finish_reason` 导致报错。\n*   **作用**：通过 `response.choices[0].finish_reason == 'tool_calls'` 来判断是否需要进入工具执行循环。\n\n### 4. Python 代码演示：安全获取属性\n\n作为软工学生，你知道**防御性编程**的重要性。直接访问属性可能会抛出 `AttributeError` 或 `KeyError`。以下是最佳实践写法：\n\n```python\nfrom openai import OpenAI\nimport json\n\nclient = OpenAI()\nresponse = client.chat.completions.create(...)\nmessage = response.choices[0].message\n\n# ❌ 不安全写法\n# args = json.loads(message.tool_calls[0].function.arguments) \n\n# ✅ 安全写法\ndef process_assistant_message(msg) -> dict:\n    \"\"\"\n    安全解析 message 对象\n    \"\"\"\n    result = {\n        \"text\": \"\",\n        \"tools\": []\n    }\n\n    # 1. 安全获取文本\n    if msg.content:\n        result[\"text\"] = msg.content.strip()\n\n    # 2. 安全获取工具调用\n    # 检查 hasattr 以防版本兼容问题，或者直接用 try-except\n    if hasattr(msg, 'tool_calls') and msg.tool_calls:\n        for tc in msg.tool_calls:\n            try:\n                # 解析参数\n                args = json.loads(tc.function.arguments)\n                \n                # 收集必要信息\n                result[\"tools\"].append({\n                    \"id\": tc.id,\n                    \"name\": tc.function.name,\n                    \"args\": args\n                })\n            except Exception as e:\n                print(f\"参数解析错误：{e}\")\n\n    return result\n\n# 调用测试\ndata = process_assistant_message(message)\nprint(data)\n```\n\n### 5. 两个高级场景提示\n\n#### A. 流式输出 (`stream=True`) 的特殊性\n当你开启 `stream=True` 时，API 不会直接返回完整的 `message` 对象。\n*   **现象**：你会收到一系列 `Chunk`。`message` 是逐步累积的。\n*   **问题**：在第一个 Chunk 中，`tool_calls` 可能还没有出现，或者 `content` 是分片字符。\n*   **对策**：你需要维护一个临时的 `accumulated_message` 字典，遍历每个 Chunk 的 `delta` 字段来拼接。直到 `finish_reason='tool_calls'` 出现，才算工具调用完整。\n*   **推荐**：如果是后台 Agent 逻辑（非前端实时打字机），建议使用**非流式接口**来简化状态管理；如果必须流式，需要封装一个专门的 `StreamParser` 类来处理聚合。\n\n#### B. `pydantic` 验证（软件工程视角）\n由于 `arguments` 是动态传入的，模型有时会违反 Schema（例如传了 `float` 给你定义的 `int` 字段）。\n*   建议在 `process_assistant_message` 中加入校验逻辑。\n*   **建议**：定义一个 Pydantic 模型对应工具的参数，使用 `Model(**args)` 进行实例化，如果失败则捕获异常并重新询问用户或让模型修正。\n\n### 总结\n`response.choices[0].message` 本质上是一个**状态容器**。\n1.  **查看 `finish_reason`** (在 choice 层) 决定下一步动作。\n2.  **查看 `tool_calls`** (在 message 层) 获取外部函数入口。\n3.  **查看 `content`** (在 message 层) 获取最终文案。\n4.  **永远不要信任原始参数**，一定要进行二次验证。\n\n理解了这些字段的边界和陷阱，你的 Agent 框架就会更加健壮。如果有具体的解析库选型疑问（比如 `openai.beta.messages` 或其他辅助库），也可以随时问我。继续加油！👷‍♂️"
+    "tool_calls": [
+      {
+        "id": "call_00_6ERC6cjEiSyD9QfPYF1alHCd",
+        "function": {
+          "arguments": "{\"city\": \"成都市\"}",
+          "name": "get_weather"
+        },
+        "type": "function",
+        "index": 0
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "call_00_6ERC6cjEiSyD9QfPYF1alHCd",
+    "content": "The weather in 成都市 is sunny."
+  },
+  {
+    "content": "根据查询结果，成都市的天气是晴朗的。",
+    "role": "assistant"
+  },
+  {
+    "role": "user",
+    "content": "查询成都市的天气情况\n"
+  },
+  {
+    "content": "我来帮您查询成都市的天气情况。",
+    "role": "assistant",
+    "tool_calls": [
+      {
+        "id": "call_00_qK3OZbzf1NYLO9nk2k0Rk8Lq",
+        "function": {
+          "arguments": "{\"city\": \"成都市\"}",
+          "name": "get_weather"
+        },
+        "type": "function",
+        "index": 0
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "call_00_qK3OZbzf1NYLO9nk2k0Rk8Lq",
+    "content": "The weather in 成都市 is sunny."
+  },
+  {
+    "content": "根据查询结果，成都市今天的天气是晴朗的。",
+    "role": "assistant"
+  },
+  {
+    "role": "user",
+    "content": "查询成都市的天气情况\n"
+  },
+  {
+    "role": "user",
+    "content": "查询成都市的天气情况\n"
+  },
+  {
+    "content": "我来帮您查询成都市的天气情况。",
+    "role": "assistant",
+    "tool_calls": [
+      {
+        "id": "call_00_UlqdiUNU7m9Ww1hIqm2t5fbR",
+        "function": {
+          "arguments": "{\"city\": \"成都市\"}",
+          "name": "get_weather"
+        },
+        "type": "function",
+        "index": 0
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "call_00_UlqdiUNU7m9Ww1hIqm2t5fbR",
+    "content": "The weather in 成都市 is sunny."
+  },
+  {
+    "content": "根据查询结果，成都市今天的天气是晴朗的。",
+    "role": "assistant"
   }
 ]

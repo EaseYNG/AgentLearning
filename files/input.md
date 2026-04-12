@@ -1,1 +1,1 @@
-介绍response.choices[0].message的属性。
+查询成都市的天气情况
