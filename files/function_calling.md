@@ -1,6 +1,4 @@
-你好！很高兴看到你对构建 AI Agent 的核心技术感兴趣。作为川大软工的学生，你一定对系统交互和 API 设计不陌生。**Function Calling（函数调用）** 是大语言模型从“聊天机器人”进化为“智能体（Agent）”的关键桥梁。它允许模型自主决定何时、何地以及如何调用外部工具或 API。
-
-下面我从**原理、流程、代码实现**三个维度为你详细拆解。
+## function calling (openai)
 
 ### 1. 核心原理
 
@@ -15,26 +13,7 @@
 3.  **执行与回传（Execute & Return）**：**注意！这是后端逻辑**。你的代码解析出模型想要调用的函数，实际执行该 Python 函数（如查询数据库），然后将结果追加到对话历史中。
 4.  **生成最终回复（Generate Response）**：再次将更新后的历史记录发给模型，让模型根据工具返回的实际结果组织语言回答用户。
 
-### 3. tools 结构
-
-```python
-tools: List [
-    {
-        "type": "function",
-        "name": "{function_name}",
-        "description": "...",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "username": {"type": "string", "description": "..."}
-            },
-            "required": ["..."],
-        },
-    },
-]
-```
-
-### 4. response 结构
+### 3. response 结构
 
 ```json
 {
@@ -60,7 +39,7 @@ tools: List [
 }
 ```
 
-### 5. message 结构
+### 4. message 结构
 
 ```json
 {
@@ -80,64 +59,150 @@ tools: List [
 }
 ```
 
-其中content和tool_calls是互斥的。
-
-### 6. Python 代码示例
-
-基于 `openai` 官方库，以下是简化版演示：
+### 5. tools 结构
 
 ```python
-from openai import OpenAI
-import json
-
-client = OpenAI(api_key="YOUR_API_KEY")
-
-# 1. 定义工具函数
-def get_current_weather(location, unit='celsius'):
-    """模拟获取天气"""
-    print(f"调用外部接口获取 {location} 的天气...")
-    return f"{location}: 晴朗，25{unit}"
-
-# 2. 构造请求结构
-tools = [{
-    "type": "function",
-    "function": {
-        "name": "get_current_weather",
-        "description": "获取指定城市的当前天气",
+tools: List [
+    {
+        "type": "function",
+        "name": "{function_name}",
+        "description": "...",
         "parameters": {
             "type": "object",
             "properties": {
-                "location": {"type": "string", "description": "城市名"},
-                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+                "username": {"type": "string", "description": "..."}
             },
-            "required": ["location"]
+            "required": ["..."],
+        },
+    },
+]
+```
+
+### 6. 注意事项
+
+1. client.chat.completion.create()返回的是一个Pydantic模型，必须通过model_dump()进行json序列化
+2. 在工具调用前后的两次请求间，必须传入完整的对话历史（第二次请求要手动传入role为tool的message，包含"tool_call_id"字段和"content"（返回值）
+3. tool_calls列表项的function.arguments是一个json字符串，需要手动json.loads()获取json
+
+### 7. Python 代码示例
+
+```python
+'''定义tools方法'''
+def get_weather(city: str):
+    return f"The weather in {city} is sunny."
+
+def recommend_activity(weather: str):
+    if weather == 'sunny':
+        return "It's time to go outside!"
+
+def notice(activity: str):
+    return "safety first!"
+
+'''创建tools字典列表'''
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "获取某城市的天气情况",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "要查询的城市名"},
+                },
+            "required": ["city"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function" : {
+            "name": "recommend_activity",
+            "description": "根据天气情况获取推荐的活动",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "weather": {"type": "string", "description": "要输入的天气"},
+                },
+                "required": ["weather"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "notice",
+            "description": "根据活动提供注意事项",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "activity": {"type": "string", "description": "要输入的活动名称"}
+                },
+            },
+            "required": "activity"
         }
     }
-}]
+]
 
-# 3. 发起第一次请求（假设模型决定调用函数）
-response = client.chat.completions.create(
-    model="gpt-4o-mini", # 推荐使用最新模型
-    messages=[{"role": "user", "content": "成都明天天气如何？"}],
-    tools=tools,
-    tool_choice="auto" # 自动决定是否调用
-)
+'''创建字符串-方法映射（用于调用方法）'''
+FUNC_MAP = {
+    "get_weather": get_weather,
+    "recommend_activity": recommend_activity,
+    "notice" : notice,
+}
 
-if response.choices[0].message.tool_calls:
-    # 4. 解析并执行真实函数
-    tool_call_id = response.choices[0].message.tool_calls[0].id
-    func_name = response.choices[0].message.tool_calls[0].function.name
-    args = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
+'''调用'''
+def call_tools(message: str, model="deepseek-chat", max_iters=10):
+    '''非流式chat
+    使用工具的调用'''
+    chat_history = History()
 
-    result = eval(func_name)(**args) # 实际开发请避免 eval，用动态导入
+    # 格式化用户输入
+    user_message = {"role": "user", "content": message}
+    chat_history.add(user_message)
 
-    # 5. 构建第二次请求（提交工具结果）
-    messages = response.choices[0].message.to_dict()
-    messages['tool_calls'][0]['function']['arguments'] = result # 简化处理，实际需加 role: tool
+    msg = None
+    
+    print("----- start chat -----")
+    iter = 0
+    while iter < max_iters:
+        response = client.chat.completions.create(
+            model=model,
+            tool_choice="auto",
+            tools=tools,
+            messages=chat_history.get()
+        )
 
-    final_response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages
-    )
-    print(final_response.choices[0].message.content)
+        # 获取response
+        msg = response.choices[0].message
+        # 加入对话历史
+        chat_history.add(msg.model_dump())
+        # 判断是否调用工具
+        if msg.tool_calls:
+            # 获取tool_calls列表
+            tool_calls = msg.tool_calls
+            # 处理每一次工具调用
+            for call in tool_calls:
+                tool_call_id = call.id
+                func_name = call.function.name
+                # 注意arguments为json字符串
+                func_args = json.loads(call.function.arguments)
+
+                # 执行对应方法
+                result = FUNC_MAP[func_name](**func_args)
+                # 构造对应的tool message并加入对话历史
+                tool_msg = {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": str(result)
+                }
+                chat_history.add(tool_msg)
+                # 继续循环至下一次对话，直到不再调用工具
+                iter += 1
+        # 不再调用tools时跳出循环
+        else:
+            break
+    
+    print("----- end chat -----")
+    return msg.content
 ```

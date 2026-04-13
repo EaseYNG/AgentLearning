@@ -2,7 +2,6 @@ import os
 from datetime import datetime
 from openai import OpenAI
 import time
-import typing
 import json
 
 def to_md(message, file_name):
@@ -28,9 +27,13 @@ class History:
         try:
             with open("files/chat_history.json", "r", encoding="utf-8") as f:
                 self.history = json.load(f)
+                # 如果history.json为空
+                if self.history is None:
+                    self.history = []
         except FileNotFoundError:
             self.history = []
     
+    # 处理好message为字典
     def add(self, message):
         self.history.append(message)
         
@@ -38,7 +41,7 @@ class History:
         with open("files/chat_history.json", "w", encoding="utf-8") as f:
             json.dump(self.history, f, ensure_ascii=False, indent=2)
     
-    def get(self):
+    def get(self) -> list:
         return self.history
     
     def clear(self):
@@ -51,12 +54,12 @@ class History:
 
 # 定义客户端
 client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com"
+    api_key=os.getenv("ALIYUN_API_KEY"),
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
 )
 
 # 调用api（非流式&流式）
-def call(message, model="deepseek-chat"):
+def call(message, model="qwen3.5-flash"):
     '''非流式chat'''
     chat_history = History()
 
@@ -76,7 +79,7 @@ def call(message, model="deepseek-chat"):
     print("----- chat finished -----")
     return response.choices[0].message.content
 
-def call_stream(message, model="deepseek-chat"):
+def call_stream(message, model="qwen3.5-flash"):
     '''流式chat生成器：不断生成流式输出块'''
     chat_history = History()
     user_message = {"role": "user", "content": message}
@@ -106,6 +109,13 @@ def call_stream(message, model="deepseek-chat"):
 def get_weather(city: str):
     return f"The weather in {city} is sunny."
 
+def recommend_activity(weather: str):
+    if weather == 'sunny':
+        return "It's time to go outside!"
+
+def notice(activity: str):
+    return "safety first!"
+
 tools = [
     {
         "type": "function",
@@ -121,74 +131,101 @@ tools = [
             }
         }
     },
+    {
+        "type": "function",
+        "function" : {
+            "name": "recommend_activity",
+            "description": "根据天气情况获取推荐的活动",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "weather": {"type": "string", "description": "要输入的天气"},
+                },
+                "required": ["weather"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "notice",
+            "description": "根据活动提供注意事项",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "activity": {"type": "string", "description": "要输入的活动名称"}
+                },
+            },
+            "required": "activity"
+        }
+    }
 ]
 
 # 字符串-函数映射
 FUNC_MAP = {
-    "get_weather": get_weather
+    "get_weather": get_weather,
+    "recommend_activity": recommend_activity,
+    "notice" : notice,
 }
 
-def call_tools(message: str, model="deepseek-chat"):
+def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
     '''非流式chat
     使用工具的调用'''
     chat_history = History()
 
     # 格式化用户输入
+    system_message = {"role": "system", "content": "你是一位精通agent开发的工程师"}
     user_message = {"role": "user", "content": message}
+    chat_history.add(system_message)
     chat_history.add(user_message)
+
+    msg = None
     
     print("----- start chat -----")
-    first_response = client.chat.completions.create(
-        model=model,
-        messages=chat_history.get(),
-        tools=tools,
-        tool_choice="auto"  # 改为 auto，让模型自己决定是否调用
-    )
+    iter = 0
+    while iter < max_iters:
+        response = client.chat.completions.create(
+            model=model,
+            tool_choice="auto",
+            tools=tools,
+            messages=chat_history.get()
+        )
 
-    msg = first_response.choices[0].message
-    
-    # 必须把第一轮的 assistant 消息完整加入历史（包含 tool_calls）
-    # 使用 model_dump 转换为字典，方便存储到 json
-    chat_history.add(msg.model_dump(exclude_none=True))
+        # 获取response
+        msg = response.choices[0].message
+        # 加入对话历史
+        chat_history.add(msg.model_dump())
+        # 判断是否调用工具
+        if msg.tool_calls:
+            # 获取tool_calls列表
+            tool_calls = msg.tool_calls
+            # 处理每一次工具调用
+            for call in tool_calls:
+                tool_call_id = call.id
+                func_name = call.function.name
+                # 注意arguments为json字符串
+                func_args = json.loads(call.function.arguments)
 
-    # 如果模型没有调用工具，直接返回内容
-    if not msg.tool_calls:
-        return msg.content or ""
-    
-    # 成功调用工具的情况，遍历所有工具调用
-    for tool_call in msg.tool_calls:
-        func_name = tool_call.function.name
-        args = json.loads(tool_call.function.arguments)
-
-        # 调用对应方法
-        if func_name in FUNC_MAP:
-            print(f"Calling tool: {func_name} with args: {args}")
-            result = FUNC_MAP[func_name](**args)
-            
-            # 将工具执行结果加入历史
-            chat_history.add({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": str(result)
-            })
+                # 执行对应方法
+                result = FUNC_MAP[func_name](**func_args)
+                # 构造对应的tool message并加入对话历史
+                tool_msg = {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": str(result)
+                }
+                chat_history.add(tool_msg)
+                # 继续循环至下一次对话，直到不再调用工具
+                iter += 1
+        # 不再调用tools时跳出循环
         else:
-            print(f"Tool {func_name} not found in FUNC_MAP")
-
-    # 创建第二次请求：模型会根据历史中的 tool_calls 和 tool 结果生成最终回答
-    second_request = client.chat.completions.create(
-        model=model,
-        messages=chat_history.get(),
-        tools=tools
-    )
-
-    final_msg = second_request.choices[0].message
-    chat_history.add(final_msg.model_dump(exclude_none=True))
+            break
     
-    print("----- chat finished -----")
-    return final_msg.content or ""
+    print("----- end chat -----")
+    return msg.content
 
-
-# # 流式输出到控制台
+# # --------------------------------------------------
+# # 流式输出测试
 # res_str = []
 # for c in call_stream(from_md("./files/input.md")):
 #     res_str.append(c)
@@ -196,7 +233,11 @@ def call_tools(message: str, model="deepseek-chat"):
 #     time.sleep(0.1)
 
 # to_md(''.join(res_str), "./files/output_buffer.md")
+# # --------------------------------------------------
 
+# --------------------------------------------------
+# function calling test
 result = call_tools(from_md("./files/input.md"))
 print(result)
 to_md(result, "./files/output_buffer.md")
+# --------------------------------------------------
