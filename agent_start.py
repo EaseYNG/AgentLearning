@@ -140,7 +140,7 @@ tools = [
                     "activity": {"type": "string", "description": "要输入的活动名称"}
                 },
             },
-            "required": "activity"
+            "required": ["activity"]
         }
     }
 ]
@@ -208,20 +208,21 @@ def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
     print("----- end chat -----")
     return msg.content
 
-# # --------------------------------------------------
-# # 流式输出测试
-# res_str = []
-# for c in call_stream(from_md("./files/input.md")):
-#     res_str.append(c)
-#     print(c, end='', flush=True)
-#     time.sleep(0.1)
+def stream_output():
+    res_str = []
+    for c in call_stream(from_md("./files/input.md")):
+        res_str.append(c)
+        print(c, end='', flush=True)
+        time.sleep(0.1)
+    to_md(''.join(res_str), "./files/output_buffer.md")
 
-# to_md(''.join(res_str), "./files/output_buffer.md")
-# # --------------------------------------------------
+def function_calling():
+    result = call_tools(from_md("./files/input.md"))
+    print(result)
+    to_md(result, "./files/output_buffer.md")
 
-# --------------------------------------------------
-# function calling test
-result = call_tools(from_md("./files/input.md"))
-print(result)
-to_md(result, "./files/output_buffer.md")
-# --------------------------------------------------
+def main():
+    stream_output()
+
+if __name__ == "__main__":
+    main()
