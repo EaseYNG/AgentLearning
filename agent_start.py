@@ -3,54 +3,37 @@ from datetime import datetime
 from openai import OpenAI
 import time
 import json
+from history_manager import HistoryManager
 
 def to_md(message, file_name):
-    with open(file_name, "w", encoding="utf-8") as f:
-        f.write(message)
+    try:
+        with open(file_name, "w", encoding="utf-8") as f:
+            f.write(message)
+    except FileNotFoundError:
+        print("文件不存在")
+    except Exception as e:
+        print(f"错误：{e}")
 
 def from_md(file_name) -> str:
-    with open(file_name, "r", encoding="utf-8") as f:
-        return f.read()
+    try:
+        with open(file_name, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        print("文件不存在")
+    except Exception as e:
+        print(f"错误：{e}")
     
 def append_md(message, file_name):
-    with open(file_name, "a", encoding="utf-8") as f:
-        f.write(message)
+    try:
+        with open(file_name, "a", encoding="utf-8") as f:
+            f.write(message)
+    except FileNotFoundError:
+        print("文件不存在")
+    except Exception as e:
+        print(f"错误：{e}")
 
-# 对话历史
-class History:
-    def __init__(self):
-        os.makedirs("files", exist_ok=True)
-        self.load()
-
-    def load(self):
-        import json
-        try:
-            with open("files/chat_history.json", "r", encoding="utf-8") as f:
-                self.history = json.load(f)
-                # 如果history.json为空
-                if self.history is None:
-                    self.history = []
-        except FileNotFoundError:
-            self.history = []
-    
-    # 处理好message为字典
-    def add(self, message):
-        self.history.append(message)
-        
-        import json
-        with open("files/chat_history.json", "w", encoding="utf-8") as f:
-            json.dump(self.history, f, ensure_ascii=False, indent=2)
-    
-    def get(self) -> list:
-        return self.history
-    
-    def clear(self):
-        self.history = []
-        
-        import json
-        with open("files/chat_history.json", "w", encoding="utf-8") as f:
-            json.dump(self.history, f, ensure_ascii=False, indent=2)
-
+# 初始化对话历史管理器
+chat_history = HistoryManager()
 
 # 定义客户端
 client = OpenAI(
@@ -61,8 +44,6 @@ client = OpenAI(
 # 调用api（非流式&流式）
 def call(message, model="qwen3.5-flash"):
     '''非流式chat'''
-    chat_history = History()
-
     user_message = {"role": "user", "content": f"{message}"}
     chat_history.add(user_message)
     messages = chat_history.get()
@@ -76,12 +57,12 @@ def call(message, model="qwen3.5-flash"):
 
     assistant_message = {"role": "assistant", "content": response.choices[0].message.content}
     chat_history.add(assistant_message)
+    chat_history.update()
     print("----- chat finished -----")
     return response.choices[0].message.content
 
 def call_stream(message, model="qwen3.5-flash"):
     '''流式chat生成器：不断生成流式输出块'''
-    chat_history = History()
     user_message = {"role": "user", "content": message}
     chat_history.add(user_message)
     messages = chat_history.get()
@@ -102,16 +83,19 @@ def call_stream(message, model="qwen3.5-flash"):
     
     full_str = ''.join(chunks)
     chat_history.add({"role": "assistant", "content": f"{full_str}"})
+    chat_history.update()
     print()
     print("----- chat finished -----")
 
 # function calling
 def get_weather(city: str):
-    return f"The weather in {city} is sunny."
+    return f"The weather in {city} is rainy."
 
 def recommend_activity(weather: str):
     if weather == 'sunny':
         return "It's time to go outside!"
+    elif weather == 'rainy':
+        return "stay at home!"
 
 def notice(activity: str):
     return "safety first!"
@@ -171,8 +155,7 @@ FUNC_MAP = {
 def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
     '''非流式chat
     使用工具的调用'''
-    chat_history = History()
-
+    
     # 格式化用户输入
     system_message = {"role": "system", "content": "你是一位精通agent开发的工程师"}
     user_message = {"role": "user", "content": message}
@@ -203,7 +186,7 @@ def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
             for call in tool_calls:
                 tool_call_id = call.id
                 func_name = call.function.name
-                # 注意arguments为json字符串
+                # 注意arguments为json字符串，需转换为dict
                 func_args = json.loads(call.function.arguments)
 
                 # 执行对应方法
@@ -221,6 +204,7 @@ def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
         else:
             break
     
+    chat_history.update()
     print("----- end chat -----")
     return msg.content
 
