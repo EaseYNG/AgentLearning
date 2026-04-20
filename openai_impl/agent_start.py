@@ -1,8 +1,7 @@
+import asyncio
 import os
-from datetime import datetime
-from openai import OpenAI
-import time
 import json
+from openai import AsyncOpenAI, OpenAIError, APIConnectionError, RateLimitError, APIStatusError
 from history_manager import HistoryManager
 
 def to_md(message, file_name):
@@ -36,20 +35,20 @@ def append_md(message, file_name):
 chat_history = HistoryManager()
 
 # 定义客户端
-client = OpenAI(
+client = AsyncOpenAI(
     api_key=os.getenv("ALIYUN_API_KEY"),
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
 )
 
 # 调用api（非流式&流式）
-def call(message, model="qwen3.5-flash"):
+async def call(message, model="qwen3.5-flash"):
     '''非流式chat'''
     user_message = {"role": "user", "content": f"{message}"}
     chat_history.add(user_message)
     messages = chat_history.get()
     
     print("----- start chat -----")
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=model,
         messages=messages,
         stream=False
@@ -61,7 +60,7 @@ def call(message, model="qwen3.5-flash"):
     print("----- chat finished -----")
     return response.choices[0].message.content
 
-def call_stream(message, model="qwen3.5-flash"):
+async def call_stream(message, model="qwen3.5-flash"):
     '''流式chat生成器：不断生成流式输出块'''
     user_message = {"role": "user", "content": message}
     chat_history.add(user_message)
@@ -70,7 +69,7 @@ def call_stream(message, model="qwen3.5-flash"):
     chunks = []
 
     print("----- chat start -----")
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=model,
         messages=messages,
         stream=True
@@ -152,7 +151,7 @@ FUNC_MAP = {
     "notice" : notice,
 }
 
-def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
+async def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
     '''非流式chat
     使用工具的调用'''
     
@@ -167,7 +166,7 @@ def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
     print("----- start chat -----")
     iter = 0
     while iter < max_iters:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=model,
             tool_choice="auto",
             tools=tools,
@@ -208,21 +207,21 @@ def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
     print("----- end chat -----")
     return msg.content
 
-def stream_output():
+async def stream_output():
     res_str = []
-    for c in call_stream(from_md("./files/input.md")):
+    async for c in call_stream(from_md("./openai_impl/files/input.md")):
         res_str.append(c)
         print(c, end='', flush=True)
-        time.sleep(0.1)
-    to_md(''.join(res_str), "./files/output_buffer.md")
+        await asyncio.sleep(0.1)
+    to_md(''.join(res_str), "./openai_impl/files/output_buffer.md")
 
-def function_calling():
-    result = call_tools(from_md("./files/input.md"))
+async def function_calling():
+    result = await call_tools(from_md("./openai_impl/files/input.md"))
     print(result)
-    to_md(result, "./files/output_buffer.md")
+    to_md(result, "./openai_impl/files/output_buffer.md")
 
-def main():
-    stream_output()
+async def main():
+    await function_calling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
