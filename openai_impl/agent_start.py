@@ -4,6 +4,8 @@ import json
 from openai import AsyncOpenAI, OpenAIError, APIConnectionError, RateLimitError, APIStatusError
 from history_manager import HistoryManager
 
+base_dir = os.path.dirname(__file__)
+
 def to_md(message, file_name):
     try:
         with open(file_name, "w", encoding="utf-8") as f:
@@ -41,7 +43,7 @@ client = AsyncOpenAI(
 )
 
 # 调用api（非流式&流式）
-async def call(message, model="qwen3.5-flash"):
+async def call(message, model="qwen3.5-397b-a17b"):
     '''非流式chat'''
     user_message = {"role": "user", "content": f"{message}"}
     chat_history.add(user_message)
@@ -60,7 +62,7 @@ async def call(message, model="qwen3.5-flash"):
     print("----- chat finished -----")
     return response.choices[0].message.content
 
-async def call_stream(message, model="qwen3.5-flash"):
+async def call_stream(message, model="qwen3.5-397b-a17b"):
     '''流式chat生成器：不断生成流式输出块'''
     user_message = {"role": "user", "content": message}
     chat_history.add(user_message)
@@ -151,7 +153,7 @@ FUNC_MAP = {
     "notice" : notice,
 }
 
-async def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
+async def call_tools(message: str, model="qwen3.5-397b-a17b", max_iters=10):
     '''非流式chat
     使用工具的调用'''
     
@@ -209,16 +211,16 @@ async def call_tools(message: str, model="qwen3.5-flash", max_iters=10):
 
 async def stream_output():
     res_str = []
-    async for c in call_stream(from_md("./openai_impl/files/input.md")):
+    async for c in call_stream(from_md(os.path.join(base_dir, "files", "input.md"))):
         res_str.append(c)
         print(c, end='', flush=True)
         await asyncio.sleep(0.1)
-    to_md(''.join(res_str), "./openai_impl/files/output_buffer.md")
+    to_md(''.join(res_str), os.path.join(base_dir, "files", "output_buffer.md"))
 
 async def function_calling():
-    result = await call_tools(from_md("./openai_impl/files/input.md"))
+    result = await call_tools(from_md(os.path.join(base_dir, "files", "input.md")))
     print(result)
-    to_md(result, "./openai_impl/files/output_buffer.md")
+    to_md(result, os.path.join(base_dir, "files", "output_buffer.md"))
 
 async def main():
     await function_calling()

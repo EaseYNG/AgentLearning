@@ -119,5 +119,201 @@
         "reasoning_content": "我已经完成了所有三个步骤，现在可以给用户完整的回复了。"
       }
     ]
+  },
+  {
+    "chat_id": "f9f24ef8-513d-457d-86a6-352575dd155e",
+    "chat_history": [
+      {
+        "role": "system",
+        "content": "你是一位精通agent开发的工程师"
+      },
+      {
+        "role": "user",
+        "content": "获取东京市天气，为我推荐活动，并给出注意事项"
+      },
+      {
+        "content": "",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [
+          {
+            "id": "call_1607635651cc4c9a9215e6ed",
+            "function": {
+              "arguments": "{\"city\": \"东京\"}",
+              "name": "get_weather"
+            },
+            "type": "function",
+            "index": 0
+          }
+        ],
+        "reasoning_content": "用户需要我完成三个任务：\n1. 获取东京市的天气情况\n2. 根据天气推荐活动\n3. 给出活动的注意事项\n\n我需要按照顺序调用这三个工具：\n1. 首先调用 get_weather 获取东京的天气\n2. 然后根据天气结果调用 recommend_activity 获取推荐活动\n3. 最后根据活动名称调用 notice 获取注意事项\n\n让我开始第一步，获取东京的天气。"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1607635651cc4c9a9215e6ed",
+        "content": "The weather in 东京 is rainy."
+      },
+      {
+        "content": "",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [
+          {
+            "id": "call_911d9ee5cf8447bda0021877",
+            "function": {
+              "arguments": "{\"weather\": \"rainy\"}",
+              "name": "recommend_activity"
+            },
+            "type": "function",
+            "index": 0
+          }
+        ],
+        "reasoning_content": "好的，东京的天气是雨天（rainy）。现在我需要根据这个天气情况推荐合适的活动。"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_911d9ee5cf8447bda0021877",
+        "content": "stay at home!"
+      },
+      {
+        "content": "",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [
+          {
+            "id": "call_f5766f8795b44221a329eebe",
+            "function": {
+              "arguments": "{\"activity\": \"stay at home!\"}",
+              "name": "notice"
+            },
+            "type": "function",
+            "index": 0
+          }
+        ],
+        "reasoning_content": "好的，推荐的天气活动是\"stay at home!\"（待在家里）。现在我需要根据这个活动名称获取注意事项。"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_f5766f8795b44221a329eebe",
+        "content": "safety first!"
+      },
+      {
+        "content": "以下是为您整理的完整信息：\n\n## 🌤️ 东京市天气\n**当前天气：雨天（rainy）**\n\n## 🎯 推荐活动\n**待在家里（stay at home!）**\n\n## ⚠️ 注意事项\n**安全第一（safety first!）**\n\n---\n\n由于今天是雨天，建议您选择在室内进行休闲活动，比如阅读、看电影或者与家人朋友聊天等，既安全又舒适！",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": null,
+        "reasoning_content": "好的，我已经完成了所有三个步骤：\n1. 获取了东京的天气 - 雨天\n2. 根据雨天推荐了活动 - 待在家里（stay at home!）\n3. 获取了该活动的注意事项 - 安全第一（safety first!）\n\n现在我可以将这些信息整合起来回复用户。"
+      }
+    ]
+  },
+  {
+    "chat_id": "f6235fe0-918e-4800-9e8d-c089d0200629",
+    "chat_history": [
+      {
+        "role": "system",
+        "content": "你是一位精通agent开发的工程师"
+      },
+      {
+        "role": "user",
+        "content": "获取东京市天气，为我推荐活动，并给出注意事项"
+      },
+      {
+        "content": "",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [
+          {
+            "id": "call_286831f382704b38a9a61dab",
+            "function": {
+              "arguments": "{\"city\": \"东京\"}",
+              "name": "get_weather"
+            },
+            "type": "function",
+            "index": 0
+          }
+        ],
+        "reasoning_content": "用户想要获取东京市的天气，然后根据天气推荐活动，并给出注意事项。我需要按顺序调用三个工具：\n\n1. 首先调用 get_weather 获取东京的天气\n2. 然后根据天气情况调用 recommend_activity 推荐活动\n3. 最后根据推荐的活动调用 notice 给出注意事项\n\n让我开始第一步，获取东京的天气。"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_286831f382704b38a9a61dab",
+        "content": "The weather in 东京 is rainy."
+      },
+      {
+        "content": "",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [
+          {
+            "id": "call_57eed18a82f449e18a2c0ed2",
+            "function": {
+              "arguments": "{\"weather\": \"rainy\"}",
+              "name": "recommend_activity"
+            },
+            "type": "function",
+            "index": 0
+          }
+        ],
+        "reasoning_content": "好的，东京的天气是雨天。现在我需要根据这个天气情况来推荐活动。"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_57eed18a82f449e18a2c0ed2",
+        "content": "stay at home!"
+      },
+      {
+        "content": "",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [
+          {
+            "id": "call_ca8e3f54ab7f4ac3825cd385",
+            "function": {
+              "arguments": "{\"activity\": \"stay at home\"}",
+              "name": "notice"
+            },
+            "type": "function",
+            "index": 0
+          }
+        ],
+        "reasoning_content": "根据雨天天气，推荐的活动是\"stay at home\"（待在家里）。现在我需要根据这个活动来获取注意事项。"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_ca8e3f54ab7f4ac3825cd385",
+        "content": "safety first!"
+      },
+      {
+        "content": "根据查询结果，为您整理如下信息：\n\n**🌧️ 东京天气**\n- 天气状况：雨天（rainy）\n\n**🏠 推荐活动**\n- stay at home（待在家里）\n\n**⚠️ 注意事项**\n- safety first!（安全第一！）\n\n---\n\n**温馨提示**：由于东京正在下雨，建议您选择室内活动，如阅读、看电影、烹饪或居家健身等。外出时请记得携带雨具，注意路面湿滑，确保出行安全！",
+        "refusal": null,
+        "role": "assistant",
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": null,
+        "reasoning_content": "好的，我已经完成了所有三个步骤：\n1. 获取东京天气：rainy（雨天）\n2. 根据天气推荐活动：stay at home（待在家里）\n3. 根据活动给出注意事项：safety first!（安全第一）\n\n现在我需要把这些信息整合起来回复给用户。"
+      }
+    ]
   }
 ]

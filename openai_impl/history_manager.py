@@ -7,7 +7,7 @@ class HistoryManager:
     def __init__(self):
         self.single_history : List[Dict] = []
         self.long_history : List[Dict] = []
-        # 获取当前文件所在目录，并以此构建 memory 路径
+        
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.memory_dir = os.path.join(self.base_dir, "memory")
         self.long_history_path = os.path.join(self.memory_dir, "long_history.json")
