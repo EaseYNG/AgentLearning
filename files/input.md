@@ -1,0 +1,1 @@
+讲讲如何为一个活动推荐系统使用langchain promptTemplate构建合适的提示词模板
